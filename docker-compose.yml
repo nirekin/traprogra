@@ -1,0 +1,121 @@
+version: '3'
+
+services:
+  reverse-proxy:
+    image: traefik # The official Traefik docker image
+    command: --api --docker --docker.swarmMode --metrics --metrics.prometheus
+
+    ports:
+      - "80:80"     # The HTTP port
+      - "8080:8080" # The Web UI (enabled by --api)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # So that Traefik can listen to the Docker events
+    networks:
+      - traefik-net
+      - back
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      
+  whoami1:
+    image: containous/whoami # A container that exposes an API to show its IP address
+    networks:
+      - traefik-net
+      - back
+    deploy:
+      replicas: 4
+      labels:
+        - traefik.port=80
+        - traefik.docker.network=traefik-net
+        - traefik.frontend.rule=Path:/whoami1
+
+  whoami2:
+    image: containous/whoami # A container that exposes an API to show its IP address
+    networks:
+      - traefik-net
+    deploy:
+      replicas: 4
+      labels:
+        - traefik.port=80
+        - traefik.docker.network=traefik-net
+        - traefik.frontend.rule=Path:/whoami2
+    
+  portainer:
+    image: portainer/portainer
+    ports:
+      - "9000:9000"
+    command: -H unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data/data
+
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      
+  viz:
+    image: dockersamples/visualizer:stable
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    ports:
+      - "8090:8080"
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - //c/Users/e518546/DockerStuff/traefik/prometheus:/etc/prometheus/
+    ports:
+      - 9090:9090
+    networks:
+      - back
+    restart: always
+
+  node-exporter:
+    image: prom/node-exporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command: 
+      - '--path.procfs=/host/proc' 
+      - '--path.sysfs=/host/sys'
+      - --collector.filesystem.ignored-mount-points
+      - "^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)"
+    ports:
+      - 9100:9100
+    networks:
+      - back
+    restart: always
+    deploy:
+      mode: global
+
+  grafana:
+    image: grafana/grafana
+    user: "104"
+    depends_on:
+      - prometheus
+    ports:
+      - 3000:3000
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=foobar
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - //c/Users/e518546/DockerStuff/traefik/grafana/provisioning/:/etc/grafana/provisioning/
+    networks:
+      - back
+    restart: always
+
+volumes:
+  portainer_data:		  
+  grafana_data: {}
+
+networks:
+  back:
+  traefik-net:
