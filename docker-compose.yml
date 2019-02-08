@@ -24,7 +24,7 @@ services:
       - traefik-net
       - back
     deploy:
-      replicas: 4
+      replicas: 2
       labels:
         - traefik.port=80
         - traefik.docker.network=traefik-net
@@ -35,7 +35,7 @@ services:
     networks:
       - traefik-net
     deploy:
-      replicas: 4
+      replicas: 2
       labels:
         - traefik.port=80
         - traefik.docker.network=traefik-net
@@ -113,7 +113,7 @@ services:
     restart: always
 
 volumes:
-  portainer_data:		  
+  portainer_data:
   grafana_data: {}
 
 networks:
